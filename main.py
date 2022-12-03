@@ -11,7 +11,7 @@ url = 'https://wolnelektury.pl/api/books/'
 urls = []
 
 #api returns all books metadata collection with hrefs to each book's further details. 
-#querying endpoint for each book's media urls details is time consuming. Urls are synthetized.
+#querying endpoint for each book's media urls details is time consuming. Urls are synthetized using a pattern.
 
 response = requests.get(url)
 if response.ok:
@@ -43,7 +43,10 @@ def download_file(url):
     if ok:
       with open(file_name, encoding='utf8') as f:
         txt = f.read()
-
+        #Each text has a similiar disclaimer appended. 
+        #Attempting to partition output text using a pattern to remove discalimer.
+        txt = txt.partition('\n-----\nTa lektura,')[0]
+        
     return ok, txt
 
 def get_word_stats(txt):
@@ -73,7 +76,7 @@ ar = Archive('./data')
 file_name_zst = './wolne_lektury_corpus.jsonl.zst'
 file_name_manifest = './wolne_lektury_corpus.manifest'
 
-#disabling some unused model features speeds thing up to 20%
+#disabling some unused model features speeds things up to 20%
 nlp = spacy.load("pl_core_news_md", disable=('ner','lemmatizer','textcat','entity_linker'))
 
 total_len = 0
