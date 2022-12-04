@@ -7,20 +7,7 @@ import spacy
 import json
 import glob
 
-url = 'https://wolnelektury.pl/api/books/'
-urls = []
 
-#api returns all books metadata collection with hrefs to each book's further details. 
-#querying endpoint for each book's media urls details is time consuming. Urls are synthetized using a pattern.
-
-response = requests.get(url)
-if response.ok:
-    
-    #urls  = [ requests.get(book['href']).json()['txt'] for book in response.json()] 
-    
-    urls = [ book['href'].replace('/api/books/','/media/book/txt/')[:-1]+'.txt' for book in response.json() ]
-    
-    
 
 def download_file(url):
 
@@ -88,25 +75,43 @@ total_nouns = 0
 total_punctuations = 0
 total_symbols = 0
 
-for idx, url_txt in enumerate(urls):
-    print(url_txt)
-    ok, txt = download_file(url_txt)
-    if ok:
-      l = len(txt.strip())
-      if l > 100000:
-        nlp.max_length = len(txt) + 100
-      sentences, words, verbs, nouns, punctuations, symbols = get_word_stats(txt.strip())
-      total_words += words
-      total_verbs += verbs
-      total_nouns += nouns
-      total_len += l
-      total_docs += 1
-      total_sentences += sentences
-      total_punctuations += punctuations
-      total_symbols += symbols
-      meta = {'url' : url_txt, 'length': l, 'sentences': sentences, 'words': words, 'verbs': verbs, 'nouns': nouns, 'punctuations': punctuations, 'symbols': symbols}
-      ar.add_data(txt.strip(), meta = meta)
-      print("Added {num}/{total} ".format(num=idx+1, total=len(urls)) + meta.get('url'))
+url = 'https://wolnelektury.pl/api/books/'
+
+#api returns all books metadata collection with hrefs to each book's further details. 
+
+books = requests.get(url)
+books_count = len(books.json())
+
+if books.ok:
+    for idx, book in enumerate(books.json()):
+        details = requests.get(book['href']).json()
+        if details['language'] == 'pol':
+            #Some details does not contain txt format media url. In such cases we are trying to synthetize url.
+            if details['txt']=='':
+                book_media_url = book['href'].replace('/api/books/','/media/book/txt/')[:-1]+'.txt'
+            else:
+                book_media_url = details['txt']
+            print(book_media_url)
+            ok, txt = download_file(book_media_url)
+            if ok:
+                l = len(txt.strip())
+                if l > 100000:
+                    nlp.max_length = len(txt) + 100
+                sentences, words, verbs, nouns, punctuations, symbols = get_word_stats(txt.strip())
+                total_words += words
+                total_verbs += verbs
+                total_nouns += nouns
+                total_len += l
+                total_docs += 1
+                total_sentences += sentences
+                total_punctuations += punctuations
+                total_symbols += symbols
+                meta = {'url' : book_media_url, 'length': l, 'sentences': sentences, 'words': words, 'verbs': verbs, 'nouns': nouns, 'punctuations': punctuations, 'symbols': symbols}
+                ar.add_data(txt.strip(), meta = meta)
+                print("Added {num}/{total} ".format(num=idx+1, total=books_count) + meta.get('url'))
+        else:
+            print("Skipping {num}/{total} Language: {lang}".format(num=idx+1, total=books_count, lang=details['language']) + book['href'].replace('/api/books/','/media/book/txt/')[:-1]+'.txt')
+    
 
 ar.commit()
 
